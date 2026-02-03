@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ASMR Ball Escape</title>
+    <style>
+        body { background: #111; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; }
+        canvas { border-radius: 50%; box-shadow: 0 0 30px rgba(0,255,255,0.3); z-index: 5; }
+        
+        /* 爆発ビデオの設定 */
+        #bomb-video {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            object-fit: cover;
+            z-index: 99;
+            /* 背景が黒い動画ならこれで見事に合成されます */
+            mix-blend-mode: screen;
+        }
+
+        #msg {
+            position: fixed;
+            color: white;
+            font-size: 8vw;
+            display: none;
+            z-index: 100;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <video id="bomb-video" muted playsinline>
+        <source src="video.mp4" type="video/mp4">
+    </video>
+
+    <div id="msg">完。</div>
+    <canvas id="c"></canvas>
+
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('bomb-video');
+        const msg = document.getElementById('msg');
+        
+        let size = Math.min(window.innerWidth, window.innerHeight) * 0.8;
+        canvas.width = canvas.height = size;
+        const centerX = size / 2, centerY = size / 2, radius = size / 2 - 10;
+
+        let x = centerX, y = centerY, vx = 6, vy = 4, ballRadius = 12;
+        let wallHealth = 100; 
+        let escaped = false;
+
+        function draw() {
+            if (escaped) return;
+
+            ctx.fillStyle = 'rgba(17, 17, 17, 0.2)';
+            ctx.fillRect(0, 0, size, size);
+
+            // 壁の描画
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `hsl(${wallHealth * 1.2}, 100%, 50%)`;
+            ctx.lineWidth = Math.max(1, wallHealth / 5);
+            ctx.stroke();
+
+            x += vx; y += vy;
+
+            const dist = Math.hypot(x - centerX, y - centerY);
+            if (dist + ballRadius > radius) {
+                const nx = (x - centerX) / dist;
+                const ny = (y - centerY) / dist;
+                const dot = vx * nx + vy * ny;
+                vx -= 2 * dot * nx;
+                vy -= 2 * dot * ny;
+                
+                wallHealth -= 1.5; // ここで削れるスピードを調整
+                
+                if (wallHealth <= 0) {
+                    startEscape();
+                }
+            }
+
+            ctx.beginPath();
+            ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#0ff';
+            ctx.fill();
+
+            requestAnimationFrame(draw);
+        }
+
+        function startEscape() {
+            escaped = true;
+            let rocketY = y;
+            let rocketX = x;
+
+            const fly = setInterval(() => {
+                ctx.fillStyle = '#111';
+                ctx.fillRect(0, 0, size, size);
+                ctx.font = "50px serif";
+                ctx.fillText("🚀", rocketX, rocketY);
+                
+                rocketY -= 15; 
+                rocketX += (Math.random() - 0.5) * 15;
+
+                if (rocketY < -100) {
+                    clearInterval(fly);
+                    triggerExplosion();
+                }
+            }, 16);
+        }
+
+        function triggerExplosion() {
+            canvas.style.display = "none";
+            video.style.display = "block";
+            
+            // 動画再生
+            video.play().catch(e => {
+                console.log("再生失敗: 画面を一度クリックしてください", e);
+                explodeFallback();
+            });
+
+            // 動画が終わった時の処理
+            video.onended = () => {
+                video.style.display = "none";
+                document.body.style.backgroundColor = "white";
+                msg.style.display = "block";
+                msg.style.color = "black";
+            };
+        }
+
+        function explodeFallback() {
+             document.body.style.backgroundColor = "red";
+             msg.style.display = "block";
+             msg.innerText = "💥ドカーン！！💥";
+        }
+
+        // 実行
+        draw();
+
+        // スマホや一部ブラウザ対策：一度画面を触らないと動画が流れない場合があるため
+        window.addEventListener('touchstart', () => video.load());
+        window.addEventListener('mousedown', () => video.load());
+
+    </script>
+</body>
+</html>
